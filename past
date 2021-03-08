@@ -1,0 +1,119 @@
+public class HDVFilter {
+
+    private final Supplier<Stream<AuctionItem>> streamSupplier;
+
+    public HDVFilter(AuctionBucket auctionBucket) {
+        this.streamSupplier = () -> auctionBucket.getAuctionItems().stream();
+    }
+
+    private HDVFilter(Stream<AuctionItem> stream) {
+        this.streamSupplier = () -> stream;
+    }
+
+    public HDVFilter filterByType(Material material) {
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        stream = stream.filter(auctionItem -> auctionItem.getItemStack().getType() == material);
+        return new HDVFilter(stream);
+    }
+    public HDVFilter filterByType(List<Material> material){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        for (Material mat : material) {
+            filterByType(mat);
+        }
+        return new HDVFilter(stream);
+    }
+
+    public HDVFilter filterByType(Material... material){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        filterByType(Arrays.asList(material));
+        return new HDVFilter(stream);
+    }
+
+    public HDVFilter filterByTime(){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        Map<AuctionItem, Long> map =new HashMap<>();
+
+        stream.forEach(auctionItem -> map.put(auctionItem, Time.convertToMill(auctionItem.getCreationTime())));
+
+        stream = map.entrySet()
+                .stream()
+                .sorted(Entry.comparingByValue())
+                .map(Map.Entry::getKey);
+        return new HDVFilter(stream);
+    }
+    public HDVFilter filterByPrice(){
+        Map<AuctionItem, Long> map =new HashMap<>();
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+
+        stream.forEach(auctionItem -> map.put(auctionItem, auctionItem.getPrice()));
+
+        stream = map.entrySet()
+                .stream()
+                .sorted(Entry.comparingByValue())
+                .map(Map.Entry::getKey);
+        return new HDVFilter(stream);
+    }
+
+    public HDVFilter reverse(){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        stream = stream.collect(rev());
+        return new HDVFilter(stream);
+    }
+
+    private <T> Collector<T, ?, Stream<T>> rev() {
+        return Collectors.collectingAndThen(Collectors.toList(), list -> {
+            Collections.reverse(list);
+            return list.stream();
+        });
+    }
+
+    public HDVFilter filterByStatus(AuctionStatus auctionStatus){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        stream = stream.filter(auctionItem1 -> auctionItem1.getStatus()== auctionStatus);
+        return new HDVFilter(stream);
+    }
+
+    public HDVFilter filterBySeller(Function<String,Boolean> function){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        stream = stream.filter(auctionItem1 -> function.apply(auctionItem1.getPlayerName()));
+        return new HDVFilter(stream);
+    }
+    public HDVFilter filterByExpirateTime(){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        stream = stream.filter(auctionItem1 -> !auctionItem1.isExpirate());
+        return new HDVFilter(stream);
+    }
+
+    public HDVFilter filterByPlayerPending(String playerPending){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        stream = stream.filter(auctionItem1 -> playerPending.equalsIgnoreCase(auctionItem1.getPlayerPending()));
+        return new HDVFilter(stream);
+    }
+
+    public HDVFilter filterByInt(int i){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        if(i==0){
+            filterByPrice();
+            return new HDVFilter(stream);
+        }else if(i==1){
+            filterByPrice().reverse();
+            return new HDVFilter(stream);
+        }else if(i==2){
+            filterByTime();
+            return new HDVFilter(stream);
+        }else if(i==3){
+            filterByTime().reverse();
+            return new HDVFilter(stream);
+        }
+        return new HDVFilter(stream);
+    }
+
+    public Stream<AuctionItem> build(){
+        Stream<AuctionItem> stream = this.streamSupplier.get();
+        return stream;
+    }
+
+    public static HDVFilter builder(AuctionBucket auctionBucket){
+        return new HDVFilter(auctionBucket);
+    }
+}
